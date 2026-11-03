@@ -1,4 +1,4 @@
-const FALLBACK_ORIGIN = "https://subrf.ru";
+const FALLBACK_ORIGIN = "https://gptplus-store.ru";
 
 /**
  * Безопасный базовый URL для metadataBase, sitemap, JSON-LD.

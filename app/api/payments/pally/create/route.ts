@@ -26,15 +26,19 @@ export async function POST(request: NextRequest) {
 
     if (!planId || !accountEmail) {
       return NextResponse.json(
-        { error: "Укажите тариф и email аккаунта ChatGPT" },
+        { error: "Укажите тариф и email" },
         { status: 400 },
       );
     }
 
     const config = await getStoreConfig();
     const split = splitPlans(config.plans);
-    const allPlans = [...(split.plus ?? CHATGPT_PLANS.plus), ...(split.pro ?? CHATGPT_PLANS.pro)];
-    const plan = allPlans.find((p) => p.id === planId);
+    const allPlans = [
+      ...(split.plus.length ? split.plus : CHATGPT_PLANS.plus),
+      ...(split.pro.length ? split.pro : CHATGPT_PLANS.pro),
+      ...config.plans.filter((p) => p.productId !== "chatgpt-plus" && p.productId !== "chatgpt-pro"),
+    ];
+    const plan = allPlans.find((p) => p.id === planId) ?? config.plans.find((p) => p.id === planId);
     if (!plan) {
       return NextResponse.json({ error: "Тариф не найден" }, { status: 400 });
     }

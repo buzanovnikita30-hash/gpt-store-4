@@ -6,14 +6,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Check, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { PLUS_PLANS, PRO_PLANS, type ExtendedPlan } from "@/lib/chatgpt-data";
+import { PLUS_PLANS, PRO_PLANS, isReadyAccountPlan, type ExtendedPlan } from "@/lib/chatgpt-data";
 import { checkoutStep2Schema, type CheckoutStep2Input } from "@/lib/validations";
 import { TokenSafetyBlock } from "@/components/ui/TokenSafetyBlock";
 import { cn } from "@/lib/utils";
 
 const ALL_PLANS = [...PLUS_PLANS, ...PRO_PLANS];
 
-const STEPS = ["Выбор тарифа", "Email аккаунта", "Оплата"];
+const DEFAULT_STEPS = ["Выбор тарифа", "Email аккаунта", "Оплата"];
+const READY_ACCOUNT_STEPS = ["Выбор тарифа", "Контактный email", "Оплата"];
 
 export function CheckoutFlow({ initialPlans }: { initialPlans?: ExtendedPlan[] }) {
   const searchParams = useSearchParams();
@@ -118,6 +119,9 @@ export function CheckoutFlow({ initialPlans }: { initialPlans?: ExtendedPlan[] }
       setIsSubmitting(false);
     }
   }
+
+  const readyAccount = isReadyAccountPlan(selectedPlan?.id);
+  const STEPS = readyAccount ? READY_ACCOUNT_STEPS : DEFAULT_STEPS;
 
   return (
     <div className="w-full max-w-2xl">
@@ -225,15 +229,19 @@ export function CheckoutFlow({ initialPlans }: { initialPlans?: ExtendedPlan[] }
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.25 }}
           >
-            <h2 className="font-heading text-xl font-bold text-gray-900 mb-2">Email вашего ChatGPT аккаунта</h2>
+            <h2 className="font-heading text-xl font-bold text-gray-900 mb-2">
+              {readyAccount ? "Контактный email" : "Email вашего ChatGPT аккаунта"}
+            </h2>
             <p className="mb-6 text-sm text-gray-500">
-              Нам нужен email, к которому привязан ваш аккаунт ChatGPT. После оплаты мы свяжемся через чат.
+              {readyAccount
+                ? "Укажите email, на который менеджер отправит почту, пароль и данные 2FA от готового аккаунта. Это не email вашего текущего ChatGPT."
+                : "Нам нужен email, к которому привязан ваш аккаунт ChatGPT. После оплаты мы свяжемся через чат."}
             </p>
 
             <form onSubmit={handleSubmit(onStep2Submit)} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Email аккаунта ChatGPT
+                  {readyAccount ? "Контактный email" : "Email аккаунта ChatGPT"}
                 </label>
                 <input
                   type="email"
@@ -243,18 +251,21 @@ export function CheckoutFlow({ initialPlans }: { initialPlans?: ExtendedPlan[] }
                     "focus:ring-2 focus:ring-[#10a37f]/30 focus:border-[#10a37f]",
                     errors.accountEmail ? "border-red-400" : "border-black/[0.12]"
                   )}
-                  placeholder="your@chatgpt-account.com"
+                  placeholder={readyAccount ? "you@email.com" : "your@chatgpt-account.com"}
                 />
                 {errors.accountEmail && (
                   <p className="mt-1 text-xs text-red-500">{errors.accountEmail.message}</p>
                 )}
               </div>
 
-              <TokenSafetyBlock compact={true} className="mt-4" supportHref="/dashboard/chat" />
+              {!readyAccount && (
+                <TokenSafetyBlock compact={true} className="mt-4" supportHref="/dashboard/chat" />
+              )}
 
               <p className="text-xs text-amber-700 rounded-xl bg-amber-50 border border-amber-200/50 px-4 py-3">
-                После оплаты напишите в чат сайта GPT STORE — там же будет инструкция по данным сессии. На email мы
-                не отправляем эту инструкцию, только короткие статусы заказа.
+                {readyAccount
+                  ? "Это выдача готового аккаунта, не подключение на ваш текущий ChatGPT. После оплаты бот подтвердит платёж, менеджер пришлёт почту, пароль и 2FA. После выдачи корректных данных услуга считается оказанной."
+                  : "После оплаты напишите в чат сайта GPT STORE — там же будет инструкция по данным сессии. На email мы не отправляем эту инструкцию, только короткие статусы заказа."}
               </p>
 
               <div className="flex gap-3">

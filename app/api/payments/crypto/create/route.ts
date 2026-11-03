@@ -32,8 +32,12 @@ export async function POST(request: NextRequest) {
   const { planId, accountEmail } = parsed.data;
   const config = await getStoreConfig();
   const split = splitPlans(config.plans);
-  const allPlans = [...(split.plus.length ? split.plus : PLUS_PLANS), ...(split.pro.length ? split.pro : PRO_PLANS)];
-  const plan = allPlans.find((p) => p.id === planId);
+  const allPlans = [
+    ...(split.plus.length ? split.plus : PLUS_PLANS),
+    ...(split.pro.length ? split.pro : PRO_PLANS),
+    ...config.plans.filter((p) => p.productId !== "chatgpt-plus" && p.productId !== "chatgpt-pro"),
+  ];
+  const plan = allPlans.find((p) => p.id === planId) ?? config.plans.find((p) => p.id === planId);
   if (!plan || plan.price <= 0) {
     return NextResponse.json({ error: "Plan not found" }, { status: 400 });
   }
@@ -44,7 +48,7 @@ export async function POST(request: NextRequest) {
   const promo = findPromo(config.promoCodes, parsed.data.promoCode, plan.id);
   const { finalPrice, discountValue } = applyPromo(plan.price, promo);
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://subrf.ru";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://gptplus-store.ru";
   const amountUsd = Math.ceil((finalPrice / USD_RATE) * 100) / 100;
 
   const { data: order, error: orderError } = await supabase

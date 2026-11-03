@@ -7,6 +7,7 @@ import { Check, Clock, Circle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { OrderStatus } from "@/types/database";
 import { cn } from "@/lib/utils";
+import { isReadyAccountPlan } from "@/lib/chatgpt-data";
 
 interface StatusStep {
   key: OrderStatus;
@@ -14,15 +15,26 @@ interface StatusStep {
   hint: string;
 }
 
-const STEPS: StatusStep[] = [
+const DEFAULT_STEPS: StatusStep[] = [
   { key: "pending", label: "Ожидает оплаты", hint: "Ожидаем подтверждение оплаты" },
   { key: "activating", label: "В работе", hint: "Наш специалист подключает вашу подписку" },
   { key: "waiting_client", label: "Ожидание токена", hint: "Напишите нам ваш токен в чат" },
   { key: "active", label: "Активировано", hint: "Подписка успешно активирована! Можете пользоваться" },
 ];
 
-function stepIndex(status: OrderStatus): number {
-  const idx = STEPS.findIndex((s) => s.key === status);
+const READY_ACCOUNT_STEPS: StatusStep[] = [
+  { key: "pending", label: "Ожидает оплаты", hint: "Ожидаем подтверждение оплаты" },
+  { key: "activating", label: "В работе", hint: "Менеджер готовит данные для входа" },
+  { key: "waiting_client", label: "Выдача данных", hint: "Ожидайте почту, пароль и 2FA в чате" },
+  { key: "active", label: "Выдано", hint: "Данные для входа отправлены — можно пользоваться" },
+];
+
+function stepsForPlan(planId?: string): StatusStep[] {
+  return isReadyAccountPlan(planId) ? READY_ACCOUNT_STEPS : DEFAULT_STEPS;
+}
+
+function stepIndex(status: OrderStatus, planId?: string): number {
+  const idx = stepsForPlan(planId).findIndex((s) => s.key === status);
   return idx === -1 ? 0 : idx;
 }
 
@@ -31,6 +43,7 @@ const ACTIVATION_MINUTES: Record<string, number> = {
   "plus-fast": 5,
   "plus-std": 15,
   "plus-new": 15,
+  "plus-ready": 15,
   "pro-5x": 10,
   "pro-20x": 10,
 };
@@ -106,7 +119,8 @@ export function OrderStatusTracker({
     return () => clearInterval(timer);
   }, [status, planId, activatedAt]);
 
-  const currentIdx = stepIndex(status);
+  const trackerSteps = stepsForPlan(planId);
+  const currentIdx = stepIndex(status, planId);
 
   return (
     <div
@@ -126,7 +140,7 @@ export function OrderStatusTracker({
 
       {/* Desktop — горизонтальный прогресс */}
       <div className="hidden items-start gap-0 md:flex">
-        {STEPS.map((step, i) => {
+        {trackerSteps.map((step, i) => {
           const isDone = i < currentIdx;
           const isCurrent = i === currentIdx;
 
@@ -167,9 +181,9 @@ export function OrderStatusTracker({
                 <div
                   className={cn(
                     "h-0.5 flex-1",
-                    i === STEPS.length - 1 ? "invisible" : isDone ? "" : isSubs ? "bg-white/15" : "bg-gray-200",
+                    i === trackerSteps.length - 1 ? "invisible" : isDone ? "" : isSubs ? "bg-white/15" : "bg-gray-200",
                   )}
-                  style={i !== STEPS.length - 1 && isDone ? { backgroundColor: accent } : undefined}
+                  style={i !== trackerSteps.length - 1 && isDone ? { backgroundColor: accent } : undefined}
                 />
               </div>
               <div className="mt-2 px-1 text-center">
@@ -200,7 +214,7 @@ export function OrderStatusTracker({
 
       {/* Mobile — вертикальный timeline */}
       <div className="flex flex-col gap-4 md:hidden">
-        {STEPS.map((step, i) => {
+        {trackerSteps.map((step, i) => {
           const isDone = i < currentIdx;
           const isCurrent = i === currentIdx;
           return (

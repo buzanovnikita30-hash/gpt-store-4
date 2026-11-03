@@ -1,4 +1,9 @@
-import { CHATGPT_PLANS, type ExtendedPlan } from "@/lib/chatgpt-data";
+import {
+  CHATGPT_PLANS,
+  READY_ACCOUNT_PLAN_ID,
+  STALE_PRO_20X_PRICES,
+  type ExtendedPlan,
+} from "@/lib/chatgpt-data";
 import type { LandingDiscount } from "@/lib/pricing-helpers";
 import { applyLandingDiscount, pickLandingDiscount } from "@/lib/pricing-helpers";
 import { fetchPromoCodesFromDb } from "@/lib/promocodes/db-promo";
@@ -78,8 +83,33 @@ function normalizePlanAvailability(input: unknown): PlanAvailabilityConfig {
   return out;
 }
 
+function applyCatalogUpdates(plans: ExtendedPlan[], availability: PlanAvailabilityConfig): ExtendedPlan[] {
+  const have = new Set(plans.map((p) => p.id));
+  const readyDefault = DEFAULT_PLANS.find((p) => p.id === READY_ACCOUNT_PLAN_ID);
+  const withReady =
+    readyDefault && !have.has(READY_ACCOUNT_PLAN_ID)
+      ? [{ ...readyDefault, inStock: availability[READY_ACCOUNT_PLAN_ID] !== false }, ...plans]
+      : plans;
+
+  const pro20Default = DEFAULT_PLANS.find((p) => p.id === "pro-20x");
+  if (!pro20Default) return withReady;
+
+  return withReady.map((plan) => {
+    if (plan.id !== "pro-20x") return plan;
+    if (!STALE_PRO_20X_PRICES.includes(plan.price)) {
+      return plan;
+    }
+    return { ...plan, price: pro20Default.price, cta: pro20Default.cta };
+  });
+}
+
 function normalizePlans(input: unknown, availability: PlanAvailabilityConfig): ExtendedPlan[] {
-  if (!Array.isArray(input)) return DEFAULT_PLANS;
+  if (!Array.isArray(input)) {
+    return applyCatalogUpdates(
+      DEFAULT_PLANS.map((plan) => ({ ...plan, inStock: availability[plan.id] !== false })),
+      availability,
+    );
+  }
   const byId = new Map(DEFAULT_PLANS.map((p) => [p.id, p]));
   const normalized = input
     .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
@@ -92,9 +122,12 @@ function normalizePlans(input: unknown, availability: PlanAvailabilityConfig): E
     .filter((p) => !!p.id);
 
   if (!normalized.length) {
-    return DEFAULT_PLANS.map((plan) => ({ ...plan, inStock: availability[plan.id] !== false }));
+    return applyCatalogUpdates(
+      DEFAULT_PLANS.map((plan) => ({ ...plan, inStock: availability[plan.id] !== false })),
+      availability,
+    );
   }
-  return normalized;
+  return applyCatalogUpdates(normalized, availability);
 }
 
 function normalizePromoCodes(input: unknown): PromoCode[] {
