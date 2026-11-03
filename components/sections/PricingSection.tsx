@@ -11,19 +11,24 @@ type RuntimePlan = (typeof PLUS_PLANS)[number] & {
 };
 
 const PLAN_HOVER_DETAILS: Record<string, string[]> = {
+  "plus-ready": [
+    "Выдача готового аккаунта ChatGPT Plus на 30 дней, не ваш текущий.",
+    "После оплаты менеджер пришлёт почту, пароль и данные 2FA.",
+    "Для активации на свой аккаунт выберите «Популярный» или «Быстрая активация».",
+  ],
   "plus-new": [
     "Только для новых аккаунтов ChatGPT без прошлой Plus-подписки.",
-    "Самая низкая цена среди Plus-тарифов при тех же функциях.",
+    "Подключение на ваш аккаунт, не выдача готового логина.",
     "Подключение в стандартной очереди, без ускоренного приоритета.",
   ],
   "plus-std": [
     "Универсальный тариф для ежедневной работы без переплаты.",
-    "Подходит, если нужен стабильный Plus на обычных условиях.",
+    "Подключение ChatGPT Plus на ваш аккаунт.",
     "Оптимальный баланс цены и скорости подключения.",
   ],
   "plus-fast": [
     "Приоритетная активация: обычно 5-15 минут после передачи данных.",
-    "Для тех, кому важно подключиться как можно быстрее.",
+    "Для тех, кому важно подключиться на свой аккаунт как можно быстрее.",
     "Те же функции Plus, но с ускоренной очередью.",
   ],
   "pro-5x": [
@@ -72,8 +77,7 @@ export function PricingSection({
         };
 
         const nextPlans = (json.plans ?? []).filter(
-          (p): p is RuntimePlan =>
-            Boolean(p?.id) && (p.productId === "chatgpt-plus" || p.productId === "chatgpt-pro")
+          (p): p is RuntimePlan => Boolean(p?.id) && Boolean(p.productId)
         );
         if (!nextPlans.length) return;
 
@@ -103,13 +107,24 @@ export function PricingSection({
     () => runtimePlans.filter((p) => p.productId === activeProduct),
     [runtimePlans, activeProduct]
   );
-  const product = PRODUCTS.find((p) => p.id === activeProduct)!;
+  const productTabs = PRODUCTS.filter(
+    (prod) =>
+      prod.id === "chatgpt-plus" ||
+      prod.id === "chatgpt-pro" ||
+      runtimePlans.some((p) => p.productId === prod.id)
+  );
+  const product = PRODUCTS.find((p) => p.id === activeProduct) ?? PRODUCTS[0]!;
   const isProDualCompare =
     activeProduct === "chatgpt-pro" && plans.length >= 2 && plans.every((p) => p.productId === "chatgpt-pro");
   const isPlusTripleCompare =
     activeProduct === "chatgpt-plus" &&
     plans.length >= 3 &&
     plans.every((p) => p.productId === "chatgpt-plus");
+  const plusCompareIds = plans.map((p) => p.id);
+  const plusGridCols =
+    plans.length >= 4
+      ? "grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4"
+      : "grid grid-cols-1 gap-6 md:grid-cols-3";
 
   return (
     <section id="pricing" className="relative overflow-hidden py-20 md:py-28">
@@ -144,7 +159,7 @@ export function PricingSection({
         {/* Product switcher */}
         <div className="mb-10 flex justify-center">
           <div className="flex w-full max-w-sm gap-1 rounded-2xl border border-black/[0.08] bg-white p-1.5 sm:w-auto sm:max-w-none">
-            {PRODUCTS.map((prod) => (
+            {productTabs.map((prod) => (
               <motion.button
                 key={prod.id}
                 onClick={() => setActiveProduct(prod.id)}
@@ -213,20 +228,56 @@ export function PricingSection({
             className="mb-10"
           >
             <div className="mx-auto mb-4 grid max-w-xl grid-cols-1 gap-2 md:hidden">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                <span className="font-semibold">Новый аккаунт:</span> минимальная цена, стандартная очередь.
-              </div>
+              {plusCompareIds.includes("plus-ready") && (
+                <div className="rounded-xl border border-violet-300 bg-violet-50 px-3 py-2 text-xs text-violet-950">
+                  <span className="font-semibold">Готовый аккаунт:</span> выдача логина, не ваш текущий ChatGPT.
+                </div>
+              )}
+              {plusCompareIds.includes("plus-new") && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                  <span className="font-semibold">Новый аккаунт:</span> минимальная цена, стандартная очередь.
+                </div>
+              )}
               <div className="rounded-xl border border-[#10a37f]/35 bg-[#10a37f]/5 px-3 py-2 text-xs text-gray-700">
-                <span className="font-semibold">Популярный:</span> лучший баланс цены и скорости.
+                <span className="font-semibold">Популярный:</span> подключение на ваш аккаунт.
               </div>
               <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                <span className="font-semibold">Быстрая активация:</span> приоритетное подключение.
+                <span className="font-semibold">Быстрая активация:</span> приоритетное подключение на ваш аккаунт.
               </div>
             </div>
             <p className="mb-4 text-center text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
-              Три тарифа — отличаются цена и скорость подключения
+              {plusCompareIds.includes("plus-ready")
+                ? "Готовый аккаунт — выдача логина, остальные тарифы — на ваш ChatGPT"
+                : "Тарифы отличаются ценой и скоростью подключения"}
             </p>
-            <div className="mx-auto hidden max-w-6xl gap-4 md:grid md:grid-cols-3 md:gap-4">
+            <div
+              className={`mx-auto hidden max-w-6xl gap-4 md:grid md:gap-4 ${
+                plusCompareIds.filter((id) =>
+                  ["plus-ready", "plus-new", "plus-std", "plus-fast"].includes(id),
+                ).length >= 4
+                  ? "md:grid-cols-2 xl:grid-cols-4"
+                  : "md:grid-cols-3"
+              }`}
+            >
+              {plusCompareIds.includes("plus-ready") && (
+                <div className="relative overflow-hidden rounded-2xl border-2 border-violet-400/80 bg-gradient-to-br from-violet-50 via-white to-white p-4 shadow-md shadow-violet-500/10 ring-1 ring-violet-200/60 md:p-5">
+                  <span className="relative inline-flex rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                    Выдача логина
+                  </span>
+                  <p className="relative mt-2 text-xs font-bold uppercase tracking-wider text-violet-800">Готовый аккаунт</p>
+                  <p className="relative mt-1 font-heading text-base font-bold text-violet-950 md:text-lg">
+                    Plus на 30 дней, не ваш аккаунт
+                  </p>
+                  <p className="relative mt-2 text-xs leading-relaxed text-violet-900/90 md:text-sm">
+                    После оплаты менеджер отправит почту, пароль и 2FA. Не для продления вашего текущего ChatGPT.
+                  </p>
+                  <div className="relative mt-3 flex h-2 overflow-hidden rounded-full bg-violet-200/80">
+                    <div className="h-full w-[40%] rounded-full bg-violet-500" />
+                  </div>
+                  <p className="relative mt-1.5 text-[10px] font-medium text-violet-800 md:text-[11px]">Выдача данных после оплаты</p>
+                </div>
+              )}
+              {plusCompareIds.includes("plus-new") && (
               <div className="relative overflow-hidden rounded-2xl border border-slate-200/95 bg-gradient-to-br from-slate-50/50 via-white to-white p-4 shadow-sm shadow-slate-500/5 md:p-5">
                 <p className="relative text-xs font-bold uppercase tracking-wider text-slate-500">Новые аккаунты</p>
                 <p className="relative mt-1 font-heading text-base font-bold text-slate-900 md:text-lg">
@@ -240,16 +291,17 @@ export function PricingSection({
                 </div>
                 <p className="relative mt-1.5 text-[10px] font-medium text-slate-500 md:text-[11px]">Очередь: стандартная</p>
               </div>
+              )}
               <div className="relative overflow-hidden rounded-2xl border-2 border-[#10a37f]/85 bg-gradient-to-br from-emerald-50/95 via-white to-white p-4 shadow-lg shadow-emerald-600/15 ring-2 ring-[#10a37f]/20 md:p-5">
                 <span className="relative inline-flex rounded-full bg-[#10a37f] px-2 py-0.5 text-[10px] font-bold uppercase text-white shadow-sm">
                   Главный выбор
                 </span>
                 <p className="relative mt-2 text-xs font-bold uppercase tracking-wider text-emerald-800">Популярный</p>
                 <p className="relative mt-1 font-heading text-base font-bold text-gray-900 md:text-lg">
-                  Цена и очередь
+                  На ваш аккаунт
                 </p>
                 <p className="relative mt-2 text-xs leading-relaxed text-gray-700 md:text-sm">
-                  Универсальный вариант для ежедневного использования — тот же Plus, что и в других тарифах.
+                  Универсальный вариант для ежедневного использования — подключаем Plus на ваш ChatGPT.
                 </p>
                 <div className="relative mt-3 flex h-2 overflow-hidden rounded-full bg-emerald-100">
                   <div className="h-full w-[72%] rounded-full bg-[#10a37f]" />
@@ -265,7 +317,7 @@ export function PricingSection({
                   Вне очереди — быстрее
                 </p>
                 <p className="relative mt-2 text-xs leading-relaxed text-orange-950/90 md:text-sm">
-                  Приоритетное подключение: обычно 5–15 минут после передачи данных, без ожидания общей очереди.
+                  Приоритетное подключение на ваш аккаунт: обычно 5–15 минут после передачи данных.
                 </p>
                 <div className="relative mt-3 flex h-2 overflow-hidden rounded-full bg-amber-200/80">
                   <div className="h-full w-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500" />
@@ -354,7 +406,7 @@ export function PricingSection({
             className={
               isProDualCompare
                 ? "mx-auto grid w-full max-w-5xl auto-rows-fr grid-cols-1 gap-6 md:grid-cols-2 md:items-stretch"
-                : "grid grid-cols-1 gap-6 md:grid-cols-3"
+                : plusGridCols
             }
           >
             {plans.map((plan, index) => {
@@ -365,19 +417,21 @@ export function PricingSection({
               const showDiscount = original > displayPrice;
               const ctaText =
                 plan.price > 0
-                  ? `Подключить за ${displayPrice.toLocaleString("ru")} ${plan.currency}`
+                  ? `${plan.id === "plus-ready" ? "Купить" : "Подключить"} за ${displayPrice.toLocaleString("ru")} ${plan.currency}`
                   : plan.cta;
 
               const proTier = plan.id === "pro-5x" ? "5x" : plan.id === "pro-20x" ? "20x" : null;
               const plusTier =
                 plan.productId === "chatgpt-plus"
-                  ? plan.id === "plus-new"
-                    ? "new"
-                    : plan.id === "plus-fast"
-                      ? "fast"
-                      : plan.id === "plus-std"
-                        ? "std"
-                        : null
+                  ? plan.id === "plus-ready"
+                    ? "ready"
+                    : plan.id === "plus-new"
+                      ? "new"
+                      : plan.id === "plus-fast"
+                        ? "fast"
+                        : plan.id === "plus-std"
+                          ? "std"
+                          : null
                   : null;
 
               const proCardShell =
@@ -387,13 +441,15 @@ export function PricingSection({
                     ? "border-2 border-emerald-600/85 shadow-md shadow-emerald-600/10"
                     : "";
               const plusCardShell =
-                plusTier === "new"
-                  ? "border border-slate-200/95 bg-slate-50/30 ring-1 ring-slate-100/90"
-                  : plusTier === "fast"
-                    ? "border-2 border-amber-500/75 ring-1 ring-amber-300/45 shadow-md shadow-amber-500/10"
-                    : plusTier === "std"
-                      ? "border-2 border-[#10a37f]/85 ring-2 ring-emerald-200/50 shadow-lg shadow-emerald-600/12"
-                      : "";
+                plusTier === "ready"
+                  ? "border-2 border-violet-400/80 ring-1 ring-violet-200/70 shadow-md shadow-violet-500/10"
+                  : plusTier === "new"
+                    ? "border border-slate-200/95 bg-slate-50/30 ring-1 ring-slate-100/90"
+                    : plusTier === "fast"
+                      ? "border-2 border-amber-500/75 ring-1 ring-amber-300/45 shadow-md shadow-amber-500/10"
+                      : plusTier === "std"
+                        ? "border-2 border-[#10a37f]/85 ring-2 ring-emerald-200/50 shadow-lg shadow-emerald-600/12"
+                        : "";
               const tierShell = proCardShell || plusCardShell;
 
               const proGlow =
@@ -403,17 +459,27 @@ export function PricingSection({
                     ? "rgba(5, 150, 105, 0.14)"
                     : product.glowColor;
               const plusGlow =
-                plusTier === "new"
-                  ? "rgba(71, 85, 105, 0.14)"
-                  : plusTier === "fast"
-                    ? "rgba(234, 88, 12, 0.14)"
-                    : plusTier === "std"
-                      ? "rgba(16, 163, 127, 0.18)"
-                      : product.glowColor;
+                plusTier === "ready"
+                  ? "rgba(124, 58, 237, 0.14)"
+                  : plusTier === "new"
+                    ? "rgba(71, 85, 105, 0.14)"
+                    : plusTier === "fast"
+                      ? "rgba(234, 88, 12, 0.14)"
+                      : plusTier === "std"
+                        ? "rgba(16, 163, 127, 0.18)"
+                        : product.glowColor;
 
               const proAccent = proTier === "5x" ? "#0284c7" : proTier === "20x" ? "#059669" : product.accentColor;
               const plusAccent =
-                plusTier === "new" ? "#475569" : plusTier === "fast" ? "#c2410c" : plusTier === "std" ? "#10a37f" : product.accentColor;
+                plusTier === "ready"
+                  ? "#7c3aed"
+                  : plusTier === "new"
+                    ? "#475569"
+                    : plusTier === "fast"
+                      ? "#c2410c"
+                      : plusTier === "std"
+                        ? "#10a37f"
+                        : product.accentColor;
 
               const cardAccent = proTier ? proAccent : plusTier ? plusAccent : product.accentColor;
               const cardGlow = proTier ? proGlow : plusTier ? plusGlow : product.glowColor;
@@ -445,6 +511,10 @@ export function PricingSection({
                   if (plusTier === "std" && plan.isPopular)
                     return {
                       boxShadow: `0 0 0 4px ${plusGlow}, 0 18px 52px -14px rgba(16, 163, 127, 0.28)`,
+                    };
+                  if (plusTier === "ready")
+                    return {
+                      boxShadow: `0 0 0 3px rgba(167, 139, 250, 0.25), 0 12px 38px -12px rgba(124, 58, 237, 0.18)`,
                     };
                   if (plusTier === "fast")
                     return {
@@ -505,6 +575,11 @@ export function PricingSection({
                     {proTier === "20x" && (
                       <span className="rounded-md bg-emerald-100 px-2 py-0.5 font-heading text-xs font-black text-emerald-900 ring-1 ring-emerald-400/70">
                         ×20 к Plus
+                      </span>
+                    )}
+                    {plusTier === "ready" && (
+                      <span className="rounded-md bg-violet-100 px-2 py-0.5 font-heading text-xs font-bold text-violet-900 ring-1 ring-violet-300/80">
+                        Не ваш аккаунт
                       </span>
                     )}
                     {plusTier === "new" && (
@@ -609,6 +684,13 @@ export function PricingSection({
                                     ? "0 6px 20px -8px rgba(2,132,199,0.45)"
                                     : "0 6px 20px -8px rgba(5,150,105,0.45)",
                               }
+                            : plusTier === "ready"
+                              ? {
+                                  background: "#7c3aed",
+                                  color: "white",
+                                  border: "1.5px solid transparent",
+                                  boxShadow: "0 6px 20px -8px rgba(124,58,237,0.45)",
+                                }
                             : plusTier === "fast"
                               ? {
                                   background: "#f97316",

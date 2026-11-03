@@ -27,7 +27,7 @@ export const newPasswordSchema = z.object({
 });
 
 export const checkoutStep2Schema = z.object({
-  accountEmail: z.string().email("Введите email аккаунта ChatGPT"),
+  accountEmail: z.string().email("Введите корректный email"),
 });
 
 export const profileUpdateSchema = z.object({

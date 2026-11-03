@@ -2,7 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { Loader2, Check } from "lucide-react";
-import { CHATGPT_PLANS, type ExtendedPlan } from "@/lib/chatgpt-data";
+import {
+  CHATGPT_PLANS,
+  READY_ACCOUNT_PLAN_ID,
+  STALE_PRO_20X_PRICES,
+  type ExtendedPlan,
+} from "@/lib/chatgpt-data";
 
 interface Props {
   initialSettings: Record<string, unknown>;
@@ -10,7 +15,7 @@ interface Props {
 
 type EditablePlan = {
   id: string;
-  productId: "chatgpt-plus" | "chatgpt-pro";
+  productId: string;
   name: string;
   price: number;
   period: string;
@@ -40,7 +45,10 @@ function normalizeAdminPlans(rawPlans: unknown, fallbackPlans: EditablePlan[]): 
           const fallback = fallbackPlans.find((x) => x.id === id) ?? fallbackPlans[0];
           return {
             id,
-            productId: p.productId === "chatgpt-pro" ? "chatgpt-pro" : "chatgpt-plus",
+            productId:
+              typeof p.productId === "string" && p.productId
+                ? p.productId
+                : "chatgpt-plus",
             name: typeof p.name === "string" ? p.name : fallback?.name ?? id,
             price: typeof p.price === "number" ? p.price : Number(p.price ?? fallback?.price ?? 0),
             period: typeof p.period === "string" ? p.period : fallback?.period ?? "мес",
@@ -60,18 +68,30 @@ function normalizeAdminPlans(rawPlans: unknown, fallbackPlans: EditablePlan[]): 
 
   const plusPlans = parsedRaw.filter((p) => p.productId === "chatgpt-plus");
   const plusFallback = fallbackPlans.filter((p) => p.productId === "chatgpt-plus");
+  const readyFallback = plusFallback.find((p) => p.id === READY_ACCOUNT_PLAN_ID);
 
-  const normalizedPlus = plusPlans.length
-    ? plusPlans
-    : plusFallback;
+  const normalizedPlus = plusPlans.length ? [...plusPlans] : [...plusFallback];
+  if (readyFallback && !normalizedPlus.some((p) => p.id === READY_ACCOUNT_PLAN_ID)) {
+    normalizedPlus.unshift(readyFallback);
+  }
 
   // Для Pro в админке всегда показываем canonical 5x/20x.
   // Если в БД legacy pro-1, он не подменяет canonical набор.
   const proFallback = fallbackPlans.filter((p) => p.productId === "chatgpt-pro");
   const proById = new Map(parsedRaw.filter((p) => p.productId === "chatgpt-pro").map((p) => [p.id, p]));
-  const normalizedPro = proFallback.map((p) => proById.get(p.id) ?? p);
+  const normalizedPro = proFallback.map((p) => {
+    const fromDb = proById.get(p.id) ?? p;
+    if (p.id === "pro-20x" && STALE_PRO_20X_PRICES.includes(fromDb.price)) {
+      return { ...fromDb, price: p.price, cta: p.cta };
+    }
+    return fromDb;
+  });
 
-  return [...normalizedPlus, ...normalizedPro];
+  const extras = parsedRaw.filter(
+    (p) => p.productId !== "chatgpt-plus" && p.productId !== "chatgpt-pro",
+  );
+
+  return [...normalizedPlus, ...normalizedPro, ...extras];
 }
 
 const FIELDS = [
@@ -269,15 +289,14 @@ export function SettingsForm({ initialSettings }: Props) {
                   <label className="mb-1 block text-xs text-gray-500">Продукт</label>
                   <select
                     value={plan.productId}
-                    onChange={(e) =>
-                      updatePlan(plan.id, {
-                        productId: e.target.value === "chatgpt-pro" ? "chatgpt-pro" : "chatgpt-plus",
-                      })
-                    }
+                    onChange={(e) => updatePlan(plan.id, { productId: e.target.value })}
                     className="w-full rounded-lg border border-gray-200 px-2.5 py-2 text-sm outline-none focus:border-[#10a37f]"
                   >
                     <option value="chatgpt-plus">ChatGPT Plus</option>
                     <option value="chatgpt-pro">ChatGPT Pro</option>
+                    {plan.productId !== "chatgpt-plus" && plan.productId !== "chatgpt-pro" ? (
+                      <option value={plan.productId}>{plan.productId}</option>
+                    ) : null}
                   </select>
                 </div>
                 <div>
